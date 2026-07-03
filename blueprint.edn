@@ -1,0 +1,10 @@
+{:itonami.blueprint/id "cloud-itonami-cofog-03.2"
+ :itonami.blueprint/name "Independent Fire-Risk Inspection Robotics"
+ :itonami.blueprint/cofog "03.2"
+ :itonami.blueprint/domain :public-safety/fire-inspection
+ :itonami.blueprint/license "AGPL-3.0-or-later"
+ :itonami.blueprint/social-impact [:fire-safety :resilience :public-trust]
+ :itonami.blueprint/governor :fire-risk-governor
+ :itonami.blueprint/robotics true
+ :itonami.blueprint/required-technologies [:robotics :telemetry :forms :dmn :bpmn :audit-ledger]
+ :itonami.blueprint/status :public-oss}
