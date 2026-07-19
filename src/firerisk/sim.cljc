@@ -1,0 +1,138 @@
+(ns firerisk.sim
+  "Demo driver -- `clojure -M:dev:run`. Walks a clean contractor through
+  intake -> fire-hazard survey (escalate/approve) -> hazard escalation
+  (escalate/approve) -> reinspection scheduling (escalate/approve),
+  then shows HARD-hold scenarios: a mis-wired request whose own
+  `:effect` is not `:propose`, an unrecognized op, a fire-hazard survey
+  against an UNVERIFIED/unregistered fixed fire-protection-system site,
+  a fire-hazard survey with an implausible hazard-score sensor reading,
+  a reinspection scheduled against a site with no on-file elevated
+  finding, a proposal that tries to ACTUATE equipment directly
+  (permanently blocked, no override), a double-schedule of the same
+  reinspection window, an inspection-log patch with a fabricated
+  survey-type, and a proposal that tries to self-report a
+  fire-department dispatch through a side channel (permanently
+  blocked, no override).
+
+  Like every sibling actor's own demo, each check is exercised directly
+  and independently below, one request per HARD-hold scenario -- the
+  same 'exercise the failure mode directly, never only via a happy-path
+  actuation' discipline this fleet establishes."
+  (:require [langgraph.graph :as g]
+            [firerisk.store :as store]
+            [firerisk.operation :as op]))
+
+(def coordinator {:actor-id "coord-1" :actor-role :inspection-coordinator :phase 3})
+
+(defn- exec-op [actor tid request context]
+  (g/run* actor {:request request :context context} {:thread-id tid}))
+
+(defn- approve! [actor tid]
+  (g/run* actor {:approval {:status :approved :by "coord-1"}} {:thread-id tid :resume? true}))
+
+(defn -main [& _args]
+  (let [db (-> (store/mem-store) (store/sample-data!))
+        actor (op/build db)]
+
+    (println "== log-inspection insp-001 on site-001 (clean patch -> phase-3 auto-commit) ==")
+    (println (exec-op actor "t1"
+                       {:op :log-inspection :effect :propose :subject "insp-001"
+                        :patch {:site-id "site-001" :survey-type :building
+                                :notes "外壁・電気系統目視点検、異常なし"}}
+                       coordinator))
+
+    (println "== fire-hazard-survey find-1 on site-001 (hazard-score 20 < threshold 70 -> :normal, escalates, approve) ==")
+    (let [r (exec-op actor "t2"
+                      {:op :fire-hazard-survey :effect :propose :subject "find-1"
+                       :value {:site-id "site-001" :hazard-score 20.0}}
+                      coordinator)]
+      (println r)
+      (println "-- human inspection supervisor approves --")
+      (println (approve! actor "t2")))
+
+    (println "== escalate-hazard haz-1 on site-001 (active hazard, always escalates -- approve) ==")
+    (let [r (exec-op actor "t3"
+                      {:op :escalate-hazard :effect :propose :subject "haz-1"
+                       :value {:site-id "site-001" :hazard-type :active-fire-hazard
+                               :severity :critical :description "電気系統から発煙、即時消防出動要"}}
+                      coordinator)]
+      (println r)
+      (println "-- human dispatcher approves --")
+      (println (approve! actor "t3")))
+
+    (println "== schedule-reinspection rei-1 on site-002 (on-file ELEVATED finding -- escalates, approve) ==")
+    (let [r (exec-op actor "t4"
+                      {:op :schedule-reinspection :effect :propose :subject "rei-1"
+                       :value {:site-id "site-002" :scheduled-date "2026-08-01"
+                               :actuate-equipment? false}}
+                      coordinator)]
+      (println r)
+      (println "-- human inspection supervisor approves --")
+      (println (approve! actor "t4")))
+
+    (println "\n-- HARD-hold scenarios --\n")
+
+    (println "== log-inspection with :effect other than :propose -> HARD hold (structural) ==")
+    (println (exec-op actor "t5"
+                       {:op :log-inspection :effect :direct-write :subject "insp-001"
+                        :patch {:site-id "site-001" :survey-type :building}}
+                       coordinator))
+
+    (println "== unrecognized op -> HARD hold ==")
+    (println (exec-op actor "t6"
+                       {:op :trigger-alarm-directly :effect :propose :subject "site-001"}
+                       coordinator))
+
+    (println "== fire-hazard-survey find-2 on site-003 (UNVERIFIED/unregistered fixed fire-protection-system -> HARD hold) ==")
+    (println (exec-op actor "t7"
+                       {:op :fire-hazard-survey :effect :propose :subject "find-2"
+                        :value {:site-id "site-003" :hazard-score 10.0}}
+                       coordinator))
+
+    (println "== fire-hazard-survey find-3 on site-001 with an implausible hazard-score reading -> HARD hold ==")
+    (println (exec-op actor "t8"
+                       {:op :fire-hazard-survey :effect :propose :subject "find-3"
+                        :value {:site-id "site-001" :hazard-score 999999.0}}
+                       coordinator))
+
+    (println "== schedule-reinspection rei-2 on site-001 (no on-file ELEVATED finding -> HARD hold) ==")
+    (println (exec-op actor "t9"
+                       {:op :schedule-reinspection :effect :propose :subject "rei-2"
+                        :value {:site-id "site-001" :scheduled-date "2026-08-01"
+                                :actuate-equipment? false}}
+                       coordinator))
+
+    (println "== schedule-reinspection rei-3 on site-002 with :actuate-equipment? true -> HARD hold, PERMANENT, never reaches a human ==")
+    (println (exec-op actor "t10"
+                       {:op :schedule-reinspection :effect :propose :subject "rei-3"
+                        :value {:site-id "site-002" :scheduled-date "2026-09-01"
+                                :actuate-equipment? true}}
+                       coordinator))
+
+    (println "== schedule-reinspection rei-1 AGAIN (double-schedule -> HARD hold) ==")
+    (println (exec-op actor "t11"
+                       {:op :schedule-reinspection :effect :propose :subject "rei-1"
+                        :value {:site-id "site-002" :scheduled-date "2026-08-01"
+                                :actuate-equipment? false}}
+                       coordinator))
+
+    (println "== log-inspection insp-002 on site-001 with a fabricated survey-type -> HARD hold ==")
+    (println (exec-op actor "t12"
+                       {:op :log-inspection :effect :propose :subject "insp-002"
+                        :patch {:site-id "site-001" :survey-type :aerial-drone-strike}}
+                       coordinator))
+
+    (println "== log-inspection insp-003 on site-001 attempting to self-report a dispatch via a side channel -> HARD hold, PERMANENT ==")
+    (println (exec-op actor "t13"
+                       {:op :log-inspection :effect :propose :subject "insp-003"
+                        :patch {:site-id "site-001" :dispatched? true}}
+                       coordinator))
+
+    (println "\n== audit ledger ==")
+    (doseq [f (store/ledger db)] (println f))
+
+    (println "\n== draft risk-finding records ==")
+    (doseq [r (store/finding-history db)] (println r))
+
+    (println "\n== draft reinspection records ==")
+    (doseq [r (store/reinspection-history db)] (println r))))

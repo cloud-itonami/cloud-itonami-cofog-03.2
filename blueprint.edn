@@ -7,4 +7,35 @@
  :itonami.blueprint/governor :fire-risk-governor
  :itonami.blueprint/robotics true
  :itonami.blueprint/required-technologies [:robotics :telemetry :forms :dmn :bpmn :audit-ledger]
- :itonami.blueprint/status :public-oss}
+ :itonami.blueprint/status :public-oss
+ :itonami.blueprint/maturity :implemented
+ :itonami.blueprint/implemented-slice
+ "InspectionAdvisor ⊣ Fire-Risk Governor, langgraph-clj StateGraph,
+ append-only audit ledger. A fire-risk-inspection BACK-OFFICE
+ COORDINATION actor for an independent inspection contractor -- not
+ direct inspection-robot-actuation authority (beyond passive sensing)
+ and not a fire-department-dispatch authority. Four ops
+ (`:log-inspection` / `:fire-hazard-survey` / `:escalate-hazard` /
+ `:schedule-reinspection`), all `:effect :propose` only. Twelve
+ concrete governor checks: propose-only effect, closed op allowlist,
+ closed proposal-effect allowlist (no direct hardware control),
+ permanent equipment-actuate block, permanent dispatch-authority
+ side-channel block (this actor never self-reports a fire-department
+ dispatch outside the gated hazard-escalation path), independent site
+ verification/registration before any survey or reinspection schedule,
+ independent recompute of the elevated/normal finding from the raw
+ hazard-score sensor reading against the site's own registered
+ threshold (never trusting a proposal's own self-reported finding),
+ hazard-score plausibility validation, independent on-file-elevated-
+ finding gate before any reinspection may be scheduled (or billed),
+ double-schedule guard, and survey-type validation (closed set:
+ `:building` / `:vegetation` / `:fire-protection-system`, the latter
+ two grounded in real NFPA standards -- NFPA 25 for fixed
+ water-based fire-protection-system inspection, NFPA 1141 for
+ wildland/rural/suburban vegetation-interface fire-protection
+ infrastructure -- cited only for the survey-type taxonomy, never for
+ a fabricated numeric threshold). Hazard escalation (an active hazard
+ requiring immediate fire-department dispatch, the exact scenario this
+ README names) ALWAYS escalates to a human dispatcher;
+ `:log-inspection` is the only op eligible to auto-commit, and only at
+ phase 3 when governor-clean."}
