@@ -28,6 +28,22 @@
   set, this domain has only ONE member (`:log-inspection`) -- no
   separate no-risk lifecycle distinct from ordinary record logging.")
 
+(def read-ops
+  "Ops that only read. **Empty in this domain** -- all four ops this
+  actor coordinates produce a record, a finding, an escalation or a
+  schedule, so none of them is read-only.
+
+  It is defined anyway because a consumer composing this actor's op
+  set does `(into read-ops write-ops)` -- the shape every sibling
+  exposes. Leaving it out makes this actor look different from 147
+  siblings for no reason other than that today the set is empty.
+
+  If a read op is ever added here, `gate` below must be updated at the
+  same time: it has no read-op branch (there is nothing to branch on),
+  so a read op that is not also in `write-ops` would be HELD as
+  `:phase-disabled`."
+  #{})
+
 (def write-ops
   #{:log-inspection :fire-hazard-survey
     :escalate-hazard :schedule-reinspection})
