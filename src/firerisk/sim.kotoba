@@ -1,5 +1,5 @@
 (ns firerisk.sim
-  "Demo driver -- `clojure -M:dev:run`. Walks a clean contractor through
+  "Demo driver -- `kbb -M:dev:run`. Walks a clean contractor through
   intake -> fire-hazard survey (escalate/approve) -> hazard escalation
   (escalate/approve) -> reinspection scheduling (escalate/approve),
   then shows HARD-hold scenarios: a mis-wired request whose own

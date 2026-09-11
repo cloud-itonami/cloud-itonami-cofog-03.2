@@ -102,8 +102,8 @@ Portable `.cljc` namespaces under `src/firerisk/`:
 - `operation` — the langgraph-clj StateGraph (1 run = 1 coordination
   request); `sim` drives the offline demo.
 
-`clojure -M:dev:test` (81 tests, 210 assertions) and `clojure -M:lint`
-(clj-kondo, 0 errors). `clojure -M:dev:run` drives the demo end to end,
+`kbb -M:dev:test` (81 tests, 210 assertions) and `kbb -M:lint`
+(clj-kondo, 0 errors). `kbb -M:dev:run` drives the demo end to end,
 including every HARD-hold scenario.
 
 ## Capability layer
