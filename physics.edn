@@ -1,0 +1,33 @@
+;; What this vertical's robot physically does, declared for
+;; kotoba.robotics.process (kotoba-lang/robotics). `kbb -M:dev:physics` runs it.
+;;
+;; README "Robotics premise": a fire-risk inspection robot (thermal/smoke
+;; sensing, vegetation-density scan) performs the on-site survey for fire
+;; protection services (COFOG 03.2). Its physical work is driving the survey
+;; route over rough ground with its sensor mast, and keeping its electronics
+;; bay below their rated temperature while it scans near a hot fuel edge.
+;;
+;; Every number without a cited source is marked `estimate` in its :basis.
+;; Replacing an estimate with a sourced value is this bot's growth work.
+{:physics/schema "itonami.physical-ai.spec.v1"
+ :repo "cloud-itonami/cloud-itonami-cofog-03.2"
+ :cases
+ [{:id :survey-route-traverse
+   :kind :transport
+   :procedure "inspection UGV drives one 200 m survey leg along a firebreak carrying its thermal/smoke sensor mast"
+   :params {:mass-kg 90.0 :payload-kg 15.0 :distance-m 200.0 :v-max-mps 1.5 :a-max-mps2 0.6
+            :brake-decel-mps2 1.0 :drive-force-n 260.0 :cog-height-m 0.70 :support-half-length-m 0.35}
+   :sweep {:param :crr :values [0.02 0.05 0.10 0.15 0.20 0.25]}
+   :quantity :cycle-time-s
+   :limit {:max 180.0 :basis "estimate: one 200 m leg within a 3-minute slot so a 1 km parcel survey finishes inside a 15-minute inspection window"}
+   :boundary {:lo 0.01 :hi 0.30}}
+  {:id :sensor-bay-heat-soak
+   :kind :thermal
+   :procedure "robot holds position 10 minutes scanning a smouldering vegetation edge; 250 C hot gas at stand-off heats the mineral-wool-insulated wall of its electronics bay"
+   :params {:conductivity-w-mk 0.05 :density-kg-m3 150.0 :specific-heat-j-kgk 1000.0
+            :t0-c 30.0 :t-hot-c 250.0 :h-front-w-m2k 25.0 :t-back-ambient-c 35.0 :h-back-w-m2k 5.0
+            :threshold-c 70.0 :duration-s 600.0 :nodes 21}
+   :sweep {:param :thickness-m :values [0.005 0.010 0.020 0.030 0.045 0.060]}
+   :quantity :final-back-c
+   :limit {:max 70.0 :basis "estimate: 70 C upper operating temperature typical of commercial-grade electronics in the sensor bay"}
+   :boundary {:lo 0.002 :hi 0.08}}]}
